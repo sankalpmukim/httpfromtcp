@@ -33,6 +33,9 @@ func getLinesChannel(f io.ReadCloser) <-chan string {
 				line = readContent[indexOfNewLine+1:]
 			}
 		}
+		if len(line) > 0 {
+			linesChannel <- line
+		}
 	}()
 	return linesChannel
 }
