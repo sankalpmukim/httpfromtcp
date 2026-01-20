@@ -31,7 +31,14 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, errors.ErrUnsupported
 	}
 
-	h[strings.TrimSpace(lineContent[:idxColon])] = strings.TrimSpace(lineContent[idxColon+2:])
+	key := strings.ToLower(strings.TrimSpace(lineContent[:idxColon]))
+	value := strings.TrimSpace(lineContent[idxColon+2:])
+
+	if !isValidHeaderChars(key) {
+		return 0, false, errors.ErrUnsupported
+	}
+
+	h[key] = value
 
 	return bytesConsumed, false, nil
 }
