@@ -2,43 +2,11 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net"
-	"strings"
+
+	"github.com/sankalpmukim/httpfromtcp/internal/request"
 )
-
-func getLinesChannel(f io.ReadCloser) <-chan string {
-	linesChannel := make(chan string)
-	go func() {
-		defer close(linesChannel)
-		defer f.Close()
-
-		line := ""
-		for {
-			bytes := make([]byte, 8)
-			_, err := f.Read(bytes)
-			if err == io.EOF {
-				break
-			}
-			readContent := string(bytes)
-			indexOfNewLine := strings.Index(readContent, "\n")
-			if indexOfNewLine == -1 {
-				line += readContent
-			} else {
-				line += readContent[:indexOfNewLine]
-
-				linesChannel <- line
-
-				line = readContent[indexOfNewLine+1:]
-			}
-		}
-		if len(line) > 0 {
-			linesChannel <- line
-		}
-	}()
-	return linesChannel
-}
 
 func main() {
 	port := "42069"
@@ -55,10 +23,16 @@ func main() {
 		}
 		fmt.Printf("A Connection has been accepted. %v\n", connection)
 
-		linesChannel := getLinesChannel(connection)
-		for v := range linesChannel {
-			fmt.Printf("read: %s\n", v)
+		request, err := request.RequestFromReader(connection)
+		if err != nil {
+			log.Fatal("Error in RequestFromReader")
 		}
+
+		fmt.Println("Request line:")
+		fmt.Printf("- Method: %v\n", request.RequestLine.Method)
+		fmt.Printf("- Target: %v\n", request.RequestLine.RequestTarget)
+		fmt.Printf("- Version: %v\n", request.RequestLine.HttpVersion)
+
 		fmt.Println("The connection has been closed.")
 	}
 
