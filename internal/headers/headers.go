@@ -2,6 +2,7 @@ package headers
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -38,7 +39,12 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, errors.ErrUnsupported
 	}
 
-	h[key] = value
+	_, ok := h[key]
+	if ok {
+		h[key] += fmt.Sprintf(", %s", value)
+	} else {
+		h[key] = value
+	}
 
 	return bytesConsumed, false, nil
 }

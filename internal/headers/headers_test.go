@@ -69,4 +69,20 @@ func TestHeaders(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, 0, n)
 	assert.False(t, done)
+
+	headers = NewHeaders()
+	data = []byte("Set-Person:   lane-loves-go    \r\nSet-Person: prime-loves-zig\r\nSet-Person: tj-loves-ocaml\r\n\r\n")
+	n, done, err = headers.Parse(data)
+	require.NoError(t, err)
+	assert.False(t, done)
+	o, done, err := headers.Parse(data[n:])
+	require.NoError(t, err)
+	assert.False(t, done)
+	p, done, err := headers.Parse(data[n+o:])
+	require.NoError(t, err)
+	assert.False(t, done)
+	n, done, err = headers.Parse(data[n+o+p:])
+	assert.True(t, done)
+	assert.Equal(t, "lane-loves-go, prime-loves-zig, tj-loves-ocaml", headers["set-person"])
+
 }
