@@ -96,7 +96,8 @@ func TestHeadersParsing(t *testing.T) {
 	}
 	r, err = RequestFromReader(reader)
 	require.Error(t, err)
-	require.Nil(t, r)
+	// return request object up till that point
+	require.NotNil(t, r)
 }
 
 type chunkReader struct {
