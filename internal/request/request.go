@@ -104,7 +104,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 				if req.state == requestStateDone {
 					break
 				} else {
-					return nil, errors.New("Connection ended abruptly, before headers ended")
+					return req, errors.New("Connection ended abruptly, before headers ended")
 				}
 			}
 			return nil, err
