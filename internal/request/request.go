@@ -4,17 +4,21 @@ import (
 	"errors"
 	"io"
 	"strings"
+
+	"github.com/sankalpmukim/httpfromtcp/internal/headers"
 )
 
 type RequestState int
 
 const (
-	RequestStateInitialized RequestState = iota
-	RequestStateDone
+	requestStateInitialized RequestState = iota
+	requestStateParsingHeaders
+	requestStateDone
 )
 
 type Request struct {
 	RequestLine RequestLine
+	Headers     headers.Headers
 	state       RequestState // 0 -> initialized, 1 -> done
 }
 
@@ -80,9 +84,12 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	buf := make([]byte, bufferSize)
 	readToIndex := 0
 
-	req := &Request{state: RequestStateInitialized}
+	req := &Request{
+		state:   requestStateInitialized,
+		Headers: headers.NewHeaders(),
+	}
 
-	for req.state != RequestStateDone {
+	for req.state != requestStateDone {
 
 		// Grow if full
 		if readToIndex == len(buf) {
@@ -93,9 +100,12 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 		n, err := reader.Read(buf[readToIndex:])
 		if err != nil {
-			if err == io.EOF {
-				req.state = RequestStateDone
-				break
+			if errors.Is(err, io.EOF) {
+				if req.state == requestStateDone {
+					break
+				} else {
+					return nil, errors.New("Connection ended abruptly, before headers ended")
+				}
 			}
 			return nil, err
 		}
@@ -119,7 +129,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 func (r *Request) parse(data []byte) (int, error) {
 	switch r.state {
-	case RequestStateInitialized:
+	case requestStateInitialized:
 		bytesRead, requestLine, err := parseRequestLine(string(data))
 		if err != nil {
 			return 0, err
@@ -128,10 +138,19 @@ func (r *Request) parse(data []byte) (int, error) {
 			return 0, nil // need more data
 		}
 		r.RequestLine = requestLine
-		r.state = RequestStateDone
+		r.state = requestStateParsingHeaders
+		return bytesRead, nil
+	case requestStateParsingHeaders:
+		bytesRead, done, err := r.Headers.Parse(data)
+		if err != nil {
+			return 0, err
+		}
+		if done {
+			r.state = requestStateDone
+		}
 		return bytesRead, nil
 
-	case RequestStateDone:
+	case requestStateDone:
 		return 0, errors.New("error: trying to read data in a done state")
 
 	default:

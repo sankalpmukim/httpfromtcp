@@ -74,7 +74,7 @@ func TestHeadersParsing(t *testing.T) {
 	r, err = RequestFromReader(reader)
 	require.NoError(t, err)
 	require.NotNil(t, r)
-	assert.Equal(t, "example.com", r.Headers["host"])
+	assert.Equal(t, "localhost:42069, example.com", r.Headers["host"])
 	assert.Equal(t, 2, len(r.Headers))
 
 	// Test: Case Insensitive Headers
