@@ -19,6 +19,7 @@ const (
 type Request struct {
 	RequestLine RequestLine
 	Headers     headers.Headers
+	Body        []byte
 	state       RequestState // 0 -> initialized, 1 -> done
 }
 
