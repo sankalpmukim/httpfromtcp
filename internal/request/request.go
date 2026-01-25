@@ -2,7 +2,9 @@ package request
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/sankalpmukim/httpfromtcp/internal/headers"
@@ -13,6 +15,7 @@ type RequestState int
 const (
 	requestStateInitialized RequestState = iota
 	requestStateParsingHeaders
+	requestStateParsingBody
 	requestStateDone
 )
 
@@ -141,15 +144,39 @@ func (r *Request) parse(data []byte) (int, error) {
 		r.RequestLine = requestLine
 		r.state = requestStateParsingHeaders
 		return bytesRead, nil
+
 	case requestStateParsingHeaders:
-		bytesRead, done, err := r.Headers.Parse(data)
+		bytesRead, headersDone, err := r.Headers.Parse(data)
 		if err != nil {
 			return 0, err
 		}
-		if done {
-			r.state = requestStateDone
+		if headersDone {
+			r.state = requestStateParsingBody
 		}
 		return bytesRead, nil
+
+	case requestStateParsingBody:
+		contentLengthStr := r.Headers.Get("Content-Length")
+		if contentLengthStr == "" {
+			r.state = requestStateDone
+			return 0, nil
+		} else {
+			contentLength, err := strconv.Atoi(contentLengthStr)
+			if err != nil {
+				return 0, err
+			}
+			r.Body = append(r.Body, data...)
+			if contentLength < len(r.Body) {
+				return 0, fmt.Errorf("Received more body than Content-Length provided. Content-Length=%v, consumed body=%v", contentLength, len(r.Body))
+			}
+			// if contentLength > len(r.Body) {
+			// 	return 0, fmt.Errorf("Content-Length greater than consumed body length")
+			// }
+			if contentLength == len(r.Body) {
+				r.state = requestStateDone
+			}
+			return len(data), nil
+		}
 
 	case requestStateDone:
 		return 0, errors.New("error: trying to read data in a done state")

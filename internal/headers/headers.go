@@ -8,6 +8,14 @@ import (
 
 type Headers map[string]string
 
+func (h Headers) Get(key string) string {
+	v, ok := h[strings.ToLower(key)]
+	if !ok {
+		return ""
+	}
+	return v
+}
+
 // consumes all headers at once, and stores them in the Headers object.
 // if data does not contain CRLF, it returns early as
 // it does not have enough data yet
@@ -22,8 +30,9 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	lineContent := strings.TrimSpace(allContent[:idx])
 	bytesConsumed := idx + 2
 
-	if len(lineContent) == 0 {
-		return 0, true, nil
+	// TODO: Flimsyish logic, need to review still
+	if len(lineContent) == 0 && strings.Count(allContent, "\r\n") == 1 {
+		return 2, true, nil
 	}
 
 	idxColon := strings.Index(lineContent, ":")
