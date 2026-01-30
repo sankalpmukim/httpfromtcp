@@ -105,8 +105,34 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		n, err := reader.Read(buf[readToIndex:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
+				// case where it EOF'd but unparsed buffer exists
+				// so we still need to parse it.
+				_, err := req.parse(buf[:readToIndex])
+				if err != nil {
+					return nil, err
+				}
+
 				if req.state == requestStateDone {
 					break
+
+				} else if req.state == requestStateParsingBody {
+					// case where req.state == body parsing, but headers suggest body not expected.
+					// i.e., expected the tcp connection to get closed.
+					contentLengthStr := req.Headers.Get("Content-Length")
+					if contentLengthStr == "" {
+						req.state = requestStateDone
+						continue
+					} else {
+						contentLength, err := strconv.Atoi(contentLengthStr)
+						if err != nil {
+							return nil, err
+						}
+						if contentLength == 0 {
+							req.state = requestStateDone
+							continue
+						}
+						return req, errors.New("Connection ended abruptly, before headers ended")
+					}
 				} else {
 					return req, errors.New("Connection ended abruptly, before headers ended")
 				}
