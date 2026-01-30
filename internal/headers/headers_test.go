@@ -51,7 +51,7 @@ func TestHeaders(t *testing.T) {
 	assert.False(t, done)
 	n, done, err = headers.Parse(data[n:])
 	require.NoError(t, err)
-	assert.Equal(t, 0, n)
+	assert.Equal(t, 2, n)
 	assert.True(t, done)
 
 	// Test: Invalid spacing header
