@@ -109,24 +109,28 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			readToIndex -= consumed
 		}
 
-		// for consumed > 0 {
-		// 	consumed, err := req.parse(buf[:readToIndex])
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
+		for consumed > 0 {
+			consumed, err = req.parse(buf[:readToIndex])
+			if err != nil {
+				return nil, err
+			}
 
-		// 	if consumed > 0 {
-		// 		// slide remaining bytes to front
-		// 		copy(buf, buf[consumed:readToIndex])
-		// 		readToIndex -= consumed
-		// 	}
-		// }
+			if consumed > 0 {
+				// slide remaining bytes to front
+				copy(buf, buf[consumed:readToIndex])
+				readToIndex -= consumed
+			}
+		}
 
 		// Grow if full
 		if readToIndex == len(buf) {
 			newBuf := make([]byte, len(buf)*2)
 			copy(newBuf, buf)
 			buf = newBuf
+		}
+
+		if req.state == requestStateDone {
+			break
 		}
 
 		n, err = reader.Read(buf[readToIndex:])
