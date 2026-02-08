@@ -96,13 +96,6 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 	for req.state != requestStateDone {
 
-		// Grow if full
-		if readToIndex == len(buf) {
-			newBuf := make([]byte, len(buf)*2)
-			copy(newBuf, buf)
-			buf = newBuf
-		}
-
 		readToIndex += n
 
 		consumed, err := req.parse(buf[:readToIndex])
@@ -114,6 +107,26 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			// slide remaining bytes to front
 			copy(buf, buf[consumed:readToIndex])
 			readToIndex -= consumed
+		}
+
+		// for consumed > 0 {
+		// 	consumed, err := req.parse(buf[:readToIndex])
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
+
+		// 	if consumed > 0 {
+		// 		// slide remaining bytes to front
+		// 		copy(buf, buf[consumed:readToIndex])
+		// 		readToIndex -= consumed
+		// 	}
+		// }
+
+		// Grow if full
+		if readToIndex == len(buf) {
+			newBuf := make([]byte, len(buf)*2)
+			copy(newBuf, buf)
+			buf = newBuf
 		}
 
 		n, err = reader.Read(buf[readToIndex:])
