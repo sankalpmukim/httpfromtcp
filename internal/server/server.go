@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/sankalpmukim/httpfromtcp/internal/request"
+	"github.com/sankalpmukim/httpfromtcp/internal/response"
 	"github.com/sankalpmukim/httpfromtcp/internal/utils"
 )
 
@@ -58,11 +59,9 @@ func (s *Server) listen() error {
 }
 
 func (s *Server) handle(conn net.Conn) {
-	conn.Write([]byte(
-		"HTTP/1.1 200 OK\n" +
-			"Content-Type: text/plain\n" +
-			"Content-Length: 13\n" +
-			"\n" +
-			"Hello World!\n"))
+	response.WriteStatusLine(conn, 200)
+	defaultHeaders := response.GetDefaultHeaders(13)
+	response.WriteHeaders(conn, defaultHeaders)
+	conn.Write([]byte("Hello World!\n"))
 	conn.Close()
 }
