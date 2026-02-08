@@ -45,10 +45,14 @@ func (s *Server) listen() error {
 			request, err := request.RequestFromReader(connection)
 			s.handle(connection)
 			if err != nil {
-				fmt.Println("Error in RequestFromReader")
+				fmt.Println("Error in RequestFromReader", err)
 			}
 
-			utils.PrintRequest(*request)
+			if request != nil {
+				utils.PrintRequest(*request)
+			} else {
+				fmt.Println("Request was nil")
+			}
 		}()
 	}
 }
