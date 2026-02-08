@@ -1,25 +1,27 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net"
 	"sync/atomic"
 
 	"github.com/sankalpmukim/httpfromtcp/internal/request"
 	"github.com/sankalpmukim/httpfromtcp/internal/response"
-	"github.com/sankalpmukim/httpfromtcp/internal/utils"
 )
 
 type Server struct {
 	listener net.Listener
+	handler  Handler
 }
 
-func Serve(port int) (*Server, error) {
+func Serve(port int, handler Handler) (*Server, error) {
 	netListener, err := net.Listen("tcp", ":"+fmt.Sprint(port))
 	if err != nil {
 		return nil, err
 	}
-	serverInstance := Server{listener: netListener}
+	serverInstance := Server{listener: netListener, handler: handler}
 	go serverInstance.listen()
 
 	return &serverInstance, nil
@@ -43,25 +45,41 @@ func (s *Server) listen() error {
 		fmt.Printf("A new connection has been accepted. %v\n", connection)
 
 		go func() {
-			request, err := request.RequestFromReader(connection)
 			s.handle(connection)
-			if err != nil {
-				fmt.Println("Error in RequestFromReader", err)
-			}
-
-			if request != nil {
-				utils.PrintRequest(*request)
-			} else {
-				fmt.Println("Request was nil")
-			}
 		}()
 	}
 }
 
 func (s *Server) handle(conn net.Conn) {
-	response.WriteStatusLine(conn, 200)
-	defaultHeaders := response.GetDefaultHeaders(13)
-	response.WriteHeaders(conn, defaultHeaders)
-	conn.Write([]byte("Hello World!\n"))
+	request, err := request.RequestFromReader(conn)
+	if err != nil {
+		fmt.Println("Error in RequestFromReader", err)
+	}
+	handlersActualResponse := bytes.NewBuffer([]byte(""))
+	handlerError := s.handler(handlersActualResponse, request)
+	if handlerError == nil {
+		defaultHeaders := response.GetDefaultHeaders(handlersActualResponse.Len())
+
+		response.WriteStatusLine(conn, 200)
+		response.WriteHeaders(conn, defaultHeaders)
+		conn.Write(handlersActualResponse.Bytes())
+	} else {
+		HandleWritingError(conn, *handlerError)
+	}
 	conn.Close()
 }
+
+func HandleWritingError(w io.Writer, err HandleError) error {
+	response.WriteStatusLine(w, err.StatusCode)
+	outgoingMessage := fmt.Sprintf("An error occurred: %s", err.Message)
+	headers := response.GetDefaultHeaders(len(outgoingMessage))
+	response.WriteHeaders(w, headers)
+	_, erro := w.Write([]byte(outgoingMessage))
+	return erro
+}
+
+type HandleError struct {
+	StatusCode response.StatusCode
+	Message    string
+}
+type Handler func(w io.Writer, req *request.Request) *HandleError
