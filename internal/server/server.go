@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net"
+	"sync/atomic"
 
 	"github.com/sankalpmukim/httpfromtcp/internal/request"
 	"github.com/sankalpmukim/httpfromtcp/internal/utils"
@@ -28,19 +29,36 @@ func (s *Server) Close() error {
 	return s.listener.Close()
 }
 
+var ShuttingDown atomic.Bool
+
 func (s *Server) listen() error {
 	for {
 		connection, err := s.listener.Accept()
 		if err != nil {
-			return err
+			if !ShuttingDown.Load() {
+				return err
+			}
 		}
 		fmt.Printf("A new connection has been accepted. %v\n", connection)
 
-		request, err := request.RequestFromReader(connection)
-		if err != nil {
-			fmt.Println("Error in RequestFromReader")
-		}
+		go func() {
+			request, err := request.RequestFromReader(connection)
+			s.handle(connection)
+			if err != nil {
+				fmt.Println("Error in RequestFromReader")
+			}
 
-		utils.PrintRequest(*request)
+			utils.PrintRequest(*request)
+		}()
 	}
+}
+
+func (s *Server) handle(conn net.Conn) {
+	conn.Write([]byte(
+		"HTTP/1.1 200 OK\n" +
+			"Content-Type: text/plain\n" +
+			"Content-Length: 13\n" +
+			"\n" +
+			"Hello World!\n"))
+	conn.Close()
 }
