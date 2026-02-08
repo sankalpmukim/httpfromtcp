@@ -41,6 +41,8 @@ func (s *Server) listen() error {
 			if !ShuttingDown.Load() {
 				return err
 			}
+			fmt.Printf("Error accepting connections: %w", err)
+			continue
 		}
 		fmt.Printf("A new connection has been accepted. %v\n", connection)
 
