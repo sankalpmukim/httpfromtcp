@@ -109,7 +109,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			readToIndex -= consumed
 		}
 
-		for consumed > 0 {
+		for consumed > 0 && req.state != requestStateDone {
 			consumed, err = req.parse(buf[:readToIndex])
 			if err != nil {
 				return nil, err
