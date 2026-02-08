@@ -41,14 +41,12 @@ func (s *Server) listen() error {
 			if !ShuttingDown.Load() {
 				return err
 			}
-			fmt.Printf("Error accepting connections: %w", err)
+			fmt.Printf("Error accepting connections: %v", err)
 			continue
 		}
 		fmt.Printf("A new connection has been accepted. %v\n", connection)
 
-		go func() {
-			s.handle(connection)
-		}()
+		go s.handle(connection)
 	}
 }
 
