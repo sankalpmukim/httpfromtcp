@@ -87,6 +87,7 @@ func parseRequestLine(data string) (int, RequestLine, error) {
 func RequestFromReader(reader io.Reader) (*Request, error) {
 	buf := make([]byte, bufferSize)
 	readToIndex := 0
+	n := 0
 
 	req := &Request{
 		state:   requestStateInitialized,
@@ -102,19 +103,34 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			buf = newBuf
 		}
 
-		n, err := reader.Read(buf[readToIndex:])
+		readToIndex += n
+
+		consumed, err := req.parse(buf[:readToIndex])
+		if err != nil {
+			return nil, err
+		}
+
+		if consumed > 0 {
+			// slide remaining bytes to front
+			copy(buf, buf[consumed:readToIndex])
+			readToIndex -= consumed
+		}
+
+		n, err = reader.Read(buf[readToIndex:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				// case where it EOF'd but unparsed buffer exists
+
+				// case where it EOF'd but *if* unparsed buffer exists
 				// so we still need to parse it.
-				_, err := req.parse(buf[:readToIndex])
-				if err != nil {
-					return nil, err
+				if n != readToIndex || readToIndex != 0 {
+					_, err := req.parse(buf[:readToIndex])
+					if err != nil {
+						return nil, err
+					}
 				}
 
 				if req.state == requestStateDone {
 					break
-
 				} else if req.state == requestStateParsingBody {
 					// case where req.state == body parsing, but headers suggest body not expected.
 					// i.e., expected the tcp connection to get closed.
@@ -138,19 +154,6 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 				}
 			}
 			return nil, err
-		}
-
-		readToIndex += n
-
-		consumed, err := req.parse(buf[:readToIndex])
-		if err != nil {
-			return nil, err
-		}
-
-		if consumed > 0 {
-			// slide remaining bytes to front
-			copy(buf, buf[consumed:readToIndex])
-			readToIndex -= consumed
 		}
 	}
 
