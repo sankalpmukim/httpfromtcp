@@ -20,18 +20,21 @@ func main() {
 		case "/yourproblem":
 			w.WriteStatusLine(response.BadRequest)
 			h := response.GetDefaultHeaders(len(BadRequestTemplate))
+			h["content-type"] = "text/html"
 			w.WriteHeaders(h)
 			w.WriteBody([]byte(BadRequestTemplate))
 
 		case "/myproblem":
 			w.WriteStatusLine(response.InternalServerError)
 			h := response.GetDefaultHeaders(len(InternalServerErrorTemplate))
+			h["content-type"] = "text/html"
 			w.WriteHeaders(h)
 			w.WriteBody([]byte(InternalServerErrorTemplate))
 
 		default:
 			w.WriteStatusLine(response.OK)
 			h := response.GetDefaultHeaders(len(OkTemplate))
+			h["content-type"] = "text/html"
 			w.WriteHeaders(h)
 			w.WriteBody([]byte(OkTemplate))
 		}
