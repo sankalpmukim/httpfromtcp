@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -55,17 +54,10 @@ func (s *Server) handle(conn net.Conn) {
 	if err != nil {
 		fmt.Println("Error in RequestFromReader", err)
 	}
-	handlersActualResponse := bytes.NewBuffer([]byte(""))
-	handlerError := s.handler(handlersActualResponse, request)
-	if handlerError == nil {
-		defaultHeaders := response.GetDefaultHeaders(handlersActualResponse.Len())
 
-		response.WriteStatusLine(conn, 200)
-		response.WriteHeaders(conn, defaultHeaders)
-		conn.Write(handlersActualResponse.Bytes())
-	} else {
-		HandleWritingError(conn, *handlerError)
-	}
+	responseWriter := response.NewResponseWriter(conn)
+	s.handler(&responseWriter, request)
+
 	conn.Close()
 }
 
@@ -82,4 +74,5 @@ type HandleError struct {
 	StatusCode response.StatusCode
 	Message    string
 }
-type Handler func(w io.Writer, req *request.Request) *HandleError
+
+type Handler func(w *response.Writer, req *request.Request)

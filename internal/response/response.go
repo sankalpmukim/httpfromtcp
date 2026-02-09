@@ -1,6 +1,7 @@
 package response
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -49,4 +50,47 @@ func WriteHeaders(w io.Writer, headers headers.Headers) error {
 	fmt.Fprint(&headersString, "\r\n")
 	_, err := w.Write([]byte(headersString.String()))
 	return err
+}
+
+type writerState int
+
+const (
+	statusLineNext writerState = iota
+	headersNext
+	bodyNext
+)
+
+type Writer struct {
+	io.Writer
+	toWriteNext writerState
+}
+
+func NewResponseWriter(w io.Writer) Writer {
+	return Writer{Writer: w, toWriteNext: statusLineNext}
+}
+
+func (w *Writer) WriteStatusLine(statusCode StatusCode) error {
+	if w.toWriteNext == statusLineNext {
+		w.toWriteNext = headersNext
+		return WriteStatusLine(w, statusCode)
+	} else {
+		return errors.ErrUnsupported
+	}
+}
+
+func (w *Writer) WriteHeaders(headers headers.Headers) error {
+	if w.toWriteNext == headersNext {
+		w.toWriteNext = bodyNext
+		return WriteHeaders(w, headers)
+	} else {
+		return errors.ErrUnsupported
+	}
+}
+
+func (w *Writer) WriteBody(p []byte) (int, error) {
+	if w.toWriteNext == bodyNext {
+		return w.Write(p)
+	} else {
+		return 0, errors.ErrUnsupported
+	}
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -16,16 +15,26 @@ const port = 42069
 
 func main() {
 	server.ShuttingDown.Store(false)
-	srv, err := server.Serve(port, func(w io.Writer, req *request.Request) *server.HandleError {
+	srv, err := server.Serve(port, func(w *response.Writer, req *request.Request) {
 		switch req.RequestLine.RequestTarget {
 		case "/yourproblem":
-			return &server.HandleError{StatusCode: response.BadRequest, Message: "Your problem is not my problem\n"}
+			w.WriteStatusLine(response.BadRequest)
+			h := response.GetDefaultHeaders(len(BadRequestTemplate))
+			w.WriteHeaders(h)
+			w.WriteBody([]byte(BadRequestTemplate))
+
 		case "/myproblem":
-			return &server.HandleError{StatusCode: response.InternalServerError, Message: "Woopsie, my bad\n"}
+			w.WriteStatusLine(response.InternalServerError)
+			h := response.GetDefaultHeaders(len(InternalServerErrorTemplate))
+			w.WriteHeaders(h)
+			w.WriteBody([]byte(InternalServerErrorTemplate))
+
 		default:
-			w.Write([]byte("All good, frfr\n"))
+			w.WriteStatusLine(response.OK)
+			h := response.GetDefaultHeaders(len(OkTemplate))
+			w.WriteHeaders(h)
+			w.WriteBody([]byte(OkTemplate))
 		}
-		return nil
 	})
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
