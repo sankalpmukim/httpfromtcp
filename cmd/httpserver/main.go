@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -50,10 +51,21 @@ func main() {
 					binRequest.Header.Set(k, v)
 				}
 				resp, _ := http.DefaultClient.Do(binRequest)
-				body, _ := io.ReadAll(resp.Body)
 				w.WriteStatusLine(response.StatusCode(resp.StatusCode))
 				w.WriteHeaders(headers.ConvertInbuiltHeadersToOurHeaders(resp.Header))
-				w.WriteBody(body)
+				if resp.Header.Get("transfer-encoding") != "" {
+					fmt.Println("chunked encoding mode")
+					scanner := bufio.NewScanner(resp.Body)
+					for scanner.Scan() {
+						line := scanner.Bytes()
+						w.WriteBody(line)
+					}
+				} else {
+					fmt.Println("Not chunked encoding mode")
+					body, _ := io.ReadAll(resp.Body)
+					w.WriteBody(body)
+				}
+				fmt.Printf("Protocol: %s\n", resp.Proto)
 			} else {
 				w.WriteStatusLine(response.OK)
 				h := response.GetDefaultHeaders(len(OkTemplate))
