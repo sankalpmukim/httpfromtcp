@@ -94,3 +94,17 @@ func (w *Writer) WriteBody(p []byte) (int, error) {
 		return 0, errors.ErrUnsupported
 	}
 }
+
+func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
+	buf := make([]byte, 0, len(p)+32) // small extra for header + CRLF
+
+	buf = fmt.Appendf(buf, "%X\r\n", len(p))
+	buf = append(buf, p...)
+	buf = append(buf, "\r\n"...)
+
+	return w.Write(buf)
+}
+
+func (w *Writer) WriteChunkedBodyDone() (int, error) {
+	return w.Write([]byte("0\r\n\r\n"))
+}

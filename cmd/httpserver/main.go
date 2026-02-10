@@ -1,11 +1,17 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
+	"github.com/sankalpmukim/httpfromtcp/internal/headers"
 	"github.com/sankalpmukim/httpfromtcp/internal/request"
 	"github.com/sankalpmukim/httpfromtcp/internal/response"
 	"github.com/sankalpmukim/httpfromtcp/internal/server"
@@ -15,6 +21,7 @@ const port = 42069
 
 func main() {
 	server.ShuttingDown.Store(false)
+
 	srv, err := server.Serve(port, func(w *response.Writer, req *request.Request) {
 		switch req.RequestLine.RequestTarget {
 		case "/yourproblem":
@@ -32,11 +39,28 @@ func main() {
 			w.WriteBody([]byte(InternalServerErrorTemplate))
 
 		default:
-			w.WriteStatusLine(response.OK)
-			h := response.GetDefaultHeaders(len(OkTemplate))
-			h["content-type"] = "text/html"
-			w.WriteHeaders(h)
-			w.WriteBody([]byte(OkTemplate))
+			if after, ok := strings.CutPrefix(req.RequestLine.RequestTarget, "/httpbin"); ok {
+				httpBinTarget := fmt.Sprintf("https://httpbin.org%s", after)
+				var reqBody io.Reader = nil
+				if req.Headers.Get("content-length") != "" {
+					reqBody = bytes.NewReader(req.Body)
+				}
+				binRequest, _ := http.NewRequest(req.RequestLine.Method, httpBinTarget, reqBody)
+				for k, v := range req.Headers {
+					binRequest.Header.Set(k, v)
+				}
+				resp, _ := http.DefaultClient.Do(binRequest)
+				body, _ := io.ReadAll(resp.Body)
+				w.WriteStatusLine(response.StatusCode(resp.StatusCode))
+				w.WriteHeaders(headers.ConvertInbuiltHeadersToOurHeaders(resp.Header))
+				w.WriteBody(body)
+			} else {
+				w.WriteStatusLine(response.OK)
+				h := response.GetDefaultHeaders(len(OkTemplate))
+				h["content-type"] = "text/html"
+				w.WriteHeaders(h)
+				w.WriteBody([]byte(OkTemplate))
+			}
 		}
 	})
 	if err != nil {
