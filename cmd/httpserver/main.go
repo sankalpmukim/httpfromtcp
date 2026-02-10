@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
@@ -50,7 +51,14 @@ func main() {
 				for k, v := range req.Headers {
 					binRequest.Header.Set(k, v)
 				}
-				resp, _ := http.DefaultClient.Do(binRequest)
+				tr := &http.Transport{
+					TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper), // Disable HTTP/2
+				}
+
+				// Create a custom Client using the custom Transport
+				client := &http.Client{Transport: tr}
+
+				resp, _ := client.Do(binRequest)
 				w.WriteStatusLine(response.StatusCode(resp.StatusCode))
 				w.WriteHeaders(headers.ConvertInbuiltHeadersToOurHeaders(resp.Header))
 				if resp.Header.Get("transfer-encoding") != "" {
