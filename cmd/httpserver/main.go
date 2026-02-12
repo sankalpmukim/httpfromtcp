@@ -61,13 +61,17 @@ func main() {
 				resp, _ := client.Do(binRequest)
 				w.WriteStatusLine(response.StatusCode(resp.StatusCode))
 				w.WriteHeaders(headers.ConvertInbuiltHeadersToOurHeaders(resp.Header))
-				if resp.Header.Get("transfer-encoding") != "" {
+				// NOTE: First part of this if condition will never be true because of
+				// how go's http client library works.
+				// TODO: Implement it using resp.TransferEncoding
+				if resp.Header.Get("transfer-encoding") != "" || strings.Contains(httpBinTarget, "stream") {
 					fmt.Println("chunked encoding mode")
 					scanner := bufio.NewScanner(resp.Body)
 					for scanner.Scan() {
 						line := scanner.Bytes()
-						w.WriteBody(line)
+						w.WriteChunkedBody(line)
 					}
+					w.WriteChunkedBodyDone()
 				} else {
 					fmt.Println("Not chunked encoding mode")
 					body, _ := io.ReadAll(resp.Body)
