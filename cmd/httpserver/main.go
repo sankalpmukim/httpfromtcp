@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -105,7 +106,11 @@ func main() {
 				}
 				fmt.Printf("Protocol: %s\n", resp.Proto)
 			} else if req.RequestLine.RequestTarget == "/video" {
-				videoFileContents, _ := os.ReadFile("assets/vim.mp4")
+				videoFileContents, err := os.ReadFile("assets/vim.mp4")
+				if errors.Is(err, os.ErrNotExist) {
+					w.WriteStatusLine(response.NotFound)
+					w.WriteHeaders(response.GetDefaultHeaders(0))
+				}
 				h := response.GetDefaultHeaders(len(videoFileContents))
 				h["Content-Type"] = "video/mp4"
 				w.WriteStatusLine(response.OK)
