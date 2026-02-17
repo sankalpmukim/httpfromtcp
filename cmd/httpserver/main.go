@@ -1,15 +1,17 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -60,19 +62,43 @@ func main() {
 
 				resp, _ := client.Do(binRequest)
 				w.WriteStatusLine(response.StatusCode(resp.StatusCode))
-				w.WriteHeaders(headers.ConvertInbuiltHeadersToOurHeaders(resp.Header))
-				// NOTE: First part of this if condition will never be true because of
-				// how go's http client library works.
-				// TODO: Implement it using resp.TransferEncoding
-				if resp.Header.Get("transfer-encoding") != "" || strings.Contains(httpBinTarget, "stream") {
+				toSendHeaders := (headers.ConvertInbuiltHeadersToOurHeaders(resp.Header))
+				toSendHeaders["Connection"] = "close"
+
+				if len(resp.TransferEncoding) != 0 {
+					toSendHeaders["Transfer-Encoding"] = "chunked"
+					toSendHeaders["Trailer"] = "X-Content-SHA256, X-Content-Length"
+					delete(toSendHeaders, "content-length")
+					w.WriteHeaders(toSendHeaders)
 					fmt.Println("chunked encoding mode")
-					scanner := bufio.NewScanner(resp.Body)
-					for scanner.Scan() {
-						line := scanner.Bytes()
-						w.WriteChunkedBody(line)
+					hasher := sha256.New()
+					var totalLength int64
+
+					buf := make([]byte, 32*1024)
+
+					for {
+						n, err := resp.Body.Read(buf)
+						if n > 0 {
+							chunk := buf[:n]
+
+							hasher.Write(chunk)
+							totalLength += int64(n)
+
+							w.WriteChunkedBody(chunk)
+						}
+
+						if err == io.EOF {
+							break
+						}
 					}
-					w.WriteChunkedBodyDone()
+					trailers := headers.NewHeaders()
+					hashString := hex.EncodeToString(hasher.Sum(nil))
+
+					trailers["X-Content-SHA256"] = hashString
+					trailers["X-Content-Length"] = strconv.FormatInt(totalLength, 10)
+					w.WriteTrailers(trailers)
 				} else {
+					w.WriteHeaders(toSendHeaders)
 					fmt.Println("Not chunked encoding mode")
 					body, _ := io.ReadAll(resp.Body)
 					w.WriteBody(body)
