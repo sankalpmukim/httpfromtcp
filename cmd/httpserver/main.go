@@ -104,6 +104,13 @@ func main() {
 					w.WriteBody(body)
 				}
 				fmt.Printf("Protocol: %s\n", resp.Proto)
+			} else if req.RequestLine.RequestTarget == "/video" {
+				videoFileContents, _ := os.ReadFile("assets/vim.mp4")
+				h := response.GetDefaultHeaders(len(videoFileContents))
+				h["Content-Type"] = "video/mp4"
+				w.WriteStatusLine(response.OK)
+				w.WriteHeaders(h)
+				w.WriteBody(videoFileContents)
 			} else {
 				w.WriteStatusLine(response.OK)
 				h := response.GetDefaultHeaders(len(OkTemplate))
