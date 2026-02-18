@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -117,11 +119,35 @@ func main() {
 				w.WriteHeaders(h)
 				w.WriteBody(videoFileContents)
 			} else {
-				w.WriteStatusLine(response.OK)
-				h := response.GetDefaultHeaders(len(OkTemplate))
-				h["content-type"] = "text/html"
-				w.WriteHeaders(h)
-				w.WriteBody([]byte(OkTemplate))
+				// 	w.WriteStatusLine(response.OK)
+				// 	h := response.GetDefaultHeaders(len(OkTemplate))
+				// 	h["content-type"] = "text/html"
+				// 	w.WriteHeaders(h)
+				// 	w.WriteBody([]byte(OkTemplate))
+				fileName := fmt.Sprintf("static-file-server%s", req.RequestLine.RequestTarget)
+				if strings.HasSuffix(fileName, "/") {
+					fileName += "index"
+				}
+				file, err := os.ReadFile(fileName)
+				ext := filepath.Ext(req.RequestLine.RequestTarget)
+				if errors.Is(err, os.ErrNotExist) {
+					// try for html file
+					file, err = os.ReadFile(fmt.Sprintf("%s.html", fileName))
+				}
+				if errors.Is(err, os.ErrNotExist) {
+					w.WriteStatusLine(response.NotFound)
+					w.WriteHeaders(response.GetDefaultHeaders(0))
+				} else {
+					if ext == "" {
+						ext = "html"
+					}
+					mimeType := mime.TypeByExtension(ext)
+					w.WriteStatusLine(response.OK)
+					h := response.GetDefaultHeaders(len(file))
+					h["Content-Type"] = mimeType
+					w.WriteHeaders(h)
+					w.WriteBody(file)
+				}
 			}
 		}
 	})
